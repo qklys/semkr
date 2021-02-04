@@ -5,6 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import render, redirect
+from django.contrib.auth.models import User
 
 from main.forms import LoginForm, AddSnippetForm
 from main.models import Snippet
@@ -19,6 +20,8 @@ def get_base_context(request, pagename):
 
 
 def index_page(request):
+    if request.method == 'POST':
+        return redirect('view_snippet', int(request.POST.get("num", 0)))
     context = get_base_context(request, 'PythonBin')
     return render(request, 'pages/index.html', context)
 
@@ -28,11 +31,19 @@ def add_snippet_page(request):
     if request.method == 'POST':
         addform = AddSnippetForm(request.POST)
         if addform.is_valid():
-            record = Snippet(
-                name=addform.data['name'],
-                code=addform.data['code'],
-                creation_date=datetime.datetime.now(),
-            )
+            if request.user.is_authenticated:
+                record = Snippet(
+                    name=addform.data['name'],
+                    code=addform.data['code'],
+                    creation_date=datetime.datetime.now(),
+                    user=request.user,
+                )
+            else:
+                record = Snippet(
+                    name=addform.data['name'],
+                    code=addform.data['code'],
+                    creation_date=datetime.datetime.now(),
+                )
             record.save()
             id = record.id
             messages.add_message(request, messages.SUCCESS, "Сниппет успешно добавлен")
@@ -41,11 +52,18 @@ def add_snippet_page(request):
             messages.add_message(request, messages.ERROR, "Некорректные данные в форме")
             return redirect('add_snippet')
     else:
-        context['addform'] = AddSnippetForm(
-            initial={
-                'user': 'AnonymousUser',
-            }
-        )
+        if request.user.is_authenticated:
+            context['addform'] = AddSnippetForm(
+                initial={
+                    'user': request.user,
+                }
+            )
+        else:
+            context['addform'] = AddSnippetForm(
+                initial={
+                    'user': "AnonymousUser",
+                }
+            )
     return render(request, 'pages/add_snippet.html', context)
 
 
@@ -53,13 +71,22 @@ def view_snippet_page(request, id):
     context = get_base_context(request, 'Просмотр сниппета')
     try:
         record = Snippet.objects.get(id=id)
-        context['addform'] = AddSnippetForm(
-            initial={
-                'user': 'AnonymousUser',
-                'name': record.name,
-                'code': record.code,
-            }
-        )
+        if record.user_id is None:
+            context['addform'] = AddSnippetForm(
+                initial={
+                    'user': "AnonymousUser",
+                    'name': record.name,
+                    'code': record.code,
+                }
+            )
+        else:
+            context['addform'] = AddSnippetForm(
+                initial={
+                    'user': User.objects.get(id=record.user_id),
+                    'name': record.name,
+                    'code': record.code,
+                }
+            )
     except Snippet.DoesNotExist:
         raise Http404
     return render(request, 'pages/view_snippet.html', context)
@@ -89,4 +116,11 @@ def logout_page(request):
 
 
 def my_snippets_page(request):
-    raise NotImplementedError
+    context = {}
+    if request.user.is_authenticated:
+        context = get_base_context(request, '')
+        context['history'] = Snippet.objects.filter(user=request.user)
+        return render(request, 'pages/my_snippets.html', context)
+    else:
+        messages.add_message(request, messages.ERROR, "Войдите в систему")
+        return redirect('index')

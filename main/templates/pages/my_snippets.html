@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    textarea {
+        font-family:monospace;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col">
+        <h1>Мои сниппеты</h1>
+        <hr>
+    </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col" class="table-dark">ID</th>
+              <th scope="col" class="table-dark">Название</th>
+              <th scope="col" class="table-dark">Дата создания</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in history %}
+                <tr>
+                    <td>{{ record.id }}</td>
+                    <td><a href="/snippets/{{ record.id }}">{{ record.name }}</a></td>
+                    <td>{{ record.creation_date }}</td>
+                </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+</div>
+
+{% endblock %}
